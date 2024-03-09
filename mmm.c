@@ -3,52 +3,130 @@
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
 #include "mmm.h"
 
 /**
  * Allocate and initialize the matrices on the heap. Populate
  * the input matrices with random numbers from 0 to 99
  */
-void mmm_init() {
-	// TODO
-	// A = (double **) malloc(size * sizeof(double*));
-	// allocate the rest of the matrices
+void mmm_init()
+{
+	srand((unsigned)time(NULL)); // Seed the random number generator
 
-	// TODO
-	srand((unsigned)time(NULL));	// seed the random number generator
- 	// initialize A and B with random values between 0 and 99
-	// initialize SEQ_MATRIX and PAR_MATRIX with 0s
+	// Allocate memory for matrices A, B, SEQ_MATRIX, and PAR_MATRIX
+	A = (double **)malloc(size * sizeof(double *));
+	B = (double **)malloc(size * sizeof(double *));
+	SEQ_MATRIX = (double **)malloc(size * sizeof(double *));
+	PAR_MATRIX = (double **)malloc(size * sizeof(double *));
 
+	for (int i = 0; i < size; i++)
+	{
+		A[i] = (double *)malloc(size * sizeof(double));
+		B[i] = (double *)malloc(size * sizeof(double));
+		SEQ_MATRIX[i] = (double *)malloc(size * sizeof(double));
+		PAR_MATRIX[i] = (double *)malloc(size * sizeof(double));
+
+		for (int j = 0; j < size; j++)
+		{
+			A[i][j] = rand() % 100; // Initialize A with random values between 0 and 99
+			B[i][j] = rand() % 100; // Initialize B with random values between 0 and 99
+			SEQ_MATRIX[i][j] = 0;	// Initialize SEQ_MATRIX with 0s
+			PAR_MATRIX[i][j] = 0;	// Initialize PAR_MATRIX with 0s
+		}
+	}
 }
 
 /**
  * Reset a given matrix to zeroes (their size is in the global var)
  * @param matrix pointer to a 2D array
  */
-void mmm_reset(double **matrix) {
-	// TODO
+void mmm_reset(double **matrix)
+{
+	for (int i = 0; i < size; i++)
+	{
+		for (int j = 0; j < size; j++)
+		{
+			matrix[i][j] = 0.0;
+		}
+	}
 }
 
 /**
  * Free up memory allocated to all matrices
  * (their size is in the global var)
  */
-void mmm_freeup() {
-	// TODO
+void mmm_freeup()
+{
+	// Free each row of A, B, SEQ_MATRIX, and PAR_MATRIX
+	for (int i = 0; i < size; i++)
+	{
+		free(A[i]);
+		A[i] = NULL; // Avoid dangling pointer
+
+		free(B[i]);
+		B[i] = NULL; // Avoid dangling pointer
+
+		free(SEQ_MATRIX[i]);
+		SEQ_MATRIX[i] = NULL; // Avoid dangling pointer
+
+		free(PAR_MATRIX[i]);
+		PAR_MATRIX[i] = NULL; // Avoid dangling pointer
+	}
+
+	// Free the original array pointers
+	free(A);
+	A = NULL; // Avoid dangling pointer
+
+	free(B);
+	B = NULL; // Avoid dangling pointer
+
+	free(SEQ_MATRIX);
+	SEQ_MATRIX = NULL; // Avoid dangling pointer
+
+	free(PAR_MATRIX);
+	PAR_MATRIX = NULL; // Avoid dangling pointer
 }
 
 /**
  * Sequential MMM (size is in the global var)
  */
-void mmm_seq() {
-	// TODO - code to perform sequential MMM
+void mmm_seq()
+{
+	for (int i = 0; i < size; i++)
+	{
+		for (int j = 0; j < size; j++)
+		{
+			SEQ_MATRIX[i][j] = 0; // I'm not sure this is necessary b/c its done in mmm_init()
+			for (int k = 0; k < size; k++)
+			{
+				SEQ_MATRIX[i][j] += A[i][k] * B[k][j];
+			}
+		}
+	}
 }
 
 /**
  * Parallel MMM
  */
-void *mmm_par(void *args) {
-	// TODO - code to perform parallel MMM
+void *mmm_par(void *arg) //
+{
+	ThreadData *data = (ThreadData *)arg; // reading the struct of each thread to know its bounds
+	int start = data->start_row;
+	int end = data->end_row;
+
+	for (int i = start; i < end; i++)
+	{
+		for (int j = 0; j < size; j++)
+		{
+			PAR_MATRIX[i][j] = 0; // why this line?
+			for (int k = 0; k < size; k++)
+			{
+				PAR_MATRIX[i][j] += A[i][k] * B[k][j];
+			}
+		}
+	}
+	pthread_exit(NULL);
 }
 
 /**
@@ -58,8 +136,26 @@ void *mmm_par(void *args) {
  * @return the largest error between two corresponding elements
  * in the result matrices
  */
-double mmm_verify() {
-	// TODO
-	// You may find the math.h function fabs() to be useful here (absolute value)
-	return -1;
+double mmm_verify()
+{
+	double max_diff = 0.0; // Initialize the maximum difference to 0
+
+	// Iterate through all elements in the matrices
+	for (int i = 0; i < size; i++)
+	{
+		for (int j = 0; j < size; j++)
+		{
+			// Calculate the absolute difference between the corresponding elements
+			double diff = fabs(SEQ_MATRIX[i][j] - PAR_MATRIX[i][j]);
+
+			// Update max_diff if this difference is greater than the current max_diff
+			if (diff > max_diff)
+			{
+				max_diff = diff;
+			}
+		}
+	}
+
+	// Return the maximum difference found
+	return max_diff;
 }
